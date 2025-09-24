@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test Paid Chat Overlay</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .controls {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    .overlay-container {
+      width: 400px;
+      height: 600px;
+      border: 2px solid #444;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      position: relative;
+    }
+    button {
+      background: #7c5cff;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #6a4de6;
+    }
+    .test-section {
+      margin: 15px 0;
+    }
+    .test-section h3 {
+      margin: 0 0 10px 0;
+      color: #7c5cff;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Streamlabs Overlay Tester</h1>
+    <p>Test your paid chat overlay without needing real donations!</p>
+    
+    <div class="controls">
+      <div class="test-section">
+        <h3>💰 Donations</h3>
+        <button onclick="testDonation()">$5 Donation</button>
+        <button onclick="testBigDonation()">$50 Big Donation</button>
+        <button onclick="testDonationWithMessage()">Donation with Message</button>
+      </div>
+      
+      <div class="test-section">
+        <h3>🎬 YouTube Super Chat</h3>
+        <button onclick="testSuperChat()">$2 Super Chat</button>
+        <button onclick="testBigSuperChat()">$20 Super Chat</button>
+        <button onclick="testSuperChatJapanese()">Japanese Super Chat</button>
+      </div>
+      
+      <div class="test-section">
+        <h3>💎 Twitch</h3>
+        <button onclick="testBits()">100 Bits</button>
+        <button onclick="testHypeChat()">Hype Chat</button>
+        <button onclick="testBigBits()">1000 Bits</button>
+      </div>
+      
+      <div class="test-section">
+        <h3>🧪 Stress Tests</h3>
+        <button onclick="testSpam()">Spam Test (5 messages)</button>
+        <button onclick="testLongMessage()">Long Message Test</button>
+        <button onclick="clearMessages()">Clear All</button>
+      </div>
+    </div>
+    
+    <div class="overlay-container">
+      <iframe src="paid-chat-test.html" id="overlayFrame"></iframe>
+    </div>
+  </div>
+
+  <script>
+    function getOverlayWindow() {
+      return document.getElementById('overlayFrame').contentWindow;
+    }
+
+    function sendTestEvent(eventData) {
+      const overlayWindow = getOverlayWindow();
+      if (overlayWindow && overlayWindow.handleTestEvent) {
+        overlayWindow.handleTestEvent(eventData);
+      } else {
+        console.log('Overlay not ready yet, try again in a moment');
+      }
+    }
+
+    function testDonation() {
+      sendTestEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'TestUser123',
+          message: 'Great stream! Keep it up!',
+          amount: 5,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/7c5cff/ffffff?text=T'
+        }]
+      });
+    }
+
+    function testBigDonation() {
+      sendTestEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'BigDonor',
+          message: 'Amazing content, you deserve this!',
+          amount: 50,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/22c55e/ffffff?text=B'
+        }]
+      });
+    }
+
+    function testDonationWithMessage() {
+      sendTestEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'MessageTester',
+          message: 'This is a test message to see how the translation works with longer text content!',
+          amount: 10,
+          currency: 'EUR',
+          avatar: 'https://via.placeholder.com/40/f59e0b/ffffff?text=M'
+        }]
+      });
+    }
+
+    function testSuperChat() {
+      sendTestEvent({
+        type: 'superchat',
+        message: [{
+          type: 'superchat',
+          name: 'YouTubeViewer',
+          comment: 'Love your videos!',
+          amount: 2,
+          currency: 'USD',
+          profileImageUrl: 'https://via.placeholder.com/40/ef4444/ffffff?text=Y'
+        }]
+      });
+    }
+
+    function testBigSuperChat() {
+      sendTestEvent({
+        type: 'superchat',
+        message: [{
+          type: 'superchat',
+          name: 'SuperFan2024',
+          comment: 'You are the best creator on YouTube!',
+          amount: 20,
+          currency: 'USD',
+          profileImageUrl: 'https://via.placeholder.com/40/3b82f6/ffffff?text=S'
+        }]
+      });
+    }
+
+    function testSuperChatJapanese() {
+      sendTestEvent({
+        type: 'superchat',
+        message: [{
+          type: 'superchat',
+          name: 'TokyoViewer',
+          comment: 'こんにちは！素晴らしい配信ですね！',
+          amount: 5,
+          currency: 'JPY',
+          profileImageUrl: 'https://via.placeholder.com/40/8b5cf6/ffffff?text=J'
+        }]
+      });
+    }
+
+    function testBits() {
+      sendTestEvent({
+        type: 'bits',
+        message: [{
+          type: 'bits',
+          name: 'TwitchUser',
+          message: 'Cheer100 Great gameplay!',
+          amount: 100,
+          profileImageUrl: 'https://via.placeholder.com/40/9333ea/ffffff?text=T'
+        }]
+      });
+    }
+
+    function testHypeChat() {
+      sendTestEvent({
+        type: 'hype_chat',
+        message: [{
+          type: 'hype_chat',
+          name: 'HypedViewer',
+          message: 'This stream is incredible!',
+          amount: 3,
+          currency: 'USD',
+          profileImageUrl: 'https://via.placeholder.com/40/06b6d4/ffffff?text=H'
+        }]
+      });
+    }
+
+    function testBigBits() {
+      sendTestEvent({
+        type: 'bits',
+        message: [{
+          type: 'bits',
+          name: 'BitsBoss',
+          message: 'Cheer1000 You deserve all the support!',
+          amount: 1000,
+          profileImageUrl: 'https://via.placeholder.com/40/f97316/ffffff?text=B'
+        }]
+      });
+    }
+
+    function testSpam() {
+      const messages = [
+        { from: 'User1', message: 'First!', amount: 2 },
+        { from: 'User2', message: 'Second!', amount: 3 },
+        { from: 'User3', message: 'Third!', amount: 1 },
+        { from: 'User4', message: 'Fourth!', amount: 5 },
+        { from: 'User5', message: 'Fifth!', amount: 2 }
+      ];
+
+      messages.forEach((msg, index) => {
+        setTimeout(() => {
+          sendTestEvent({
+            type: 'donation',
+            message: [{
+              type: 'donation',
+              from: msg.from,
+              message: msg.message,
+              amount: msg.amount,
+              currency: 'USD',
+              avatar: `https://via.placeholder.com/40/7c5cff/ffffff?text=${index + 1}`
+            }]
+          });
+        }, index * 500);
+      });
+    }
+
+    function testLongMessage() {
+      sendTestEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'LongMessageTester',
+          message: 'This is a very long message to test how the overlay handles lengthy text content that might wrap to multiple lines and see how the translation system works with extended content that contains multiple sentences and various punctuation marks!',
+          amount: 15,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/ec4899/ffffff?text=L'
+        }]
+      });
+    }
+
+    function clearMessages() {
+      const overlayWindow = getOverlayWindow();
+      if (overlayWindow && overlayWindow.clearAllMessages) {
+        overlayWindow.clearAllMessages();
+      }
+    }
+  </script>
+</body>
+</html>
