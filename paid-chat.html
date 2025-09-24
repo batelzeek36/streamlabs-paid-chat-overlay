@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://* http://*; img-src * data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'self' https://cdn.jsdelivr.net https://cdn.skypack.dev https://unpkg.com 'unsafe-inline'; connect-src *;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paid‑Only Chat Overlay</title>
+
+  <!-- Fonts with broad script coverage -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;800&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Noto+Sans+Hebrew:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#0b0b12;
+      --card:#11111a;
+      --ink:#e9ecf1;
+      --muted:#a9b0bd;
+      --accent:#7c5cff; /* accent ring */
+      --good:#22c55e;  /* payment green */
+      --warn:#f59e0b;  /* superchat amber */
+      --danger:#ef4444;/* big red */
+    }
+    html,body{ height:100%; margin:0; }
+    body{
+      background: transparent; /* Browser Source transparency */
+      font-family: "Noto Sans", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans JP", "Noto Sans KR", "Noto Sans SC", "Noto Naskh Arabic", "Noto Sans Hebrew", sans-serif;
+      color: var(--ink);
+      overflow:hidden;
+    }
+    #stack{
+      position: absolute; inset: 0; display:flex; flex-direction:column; gap:10px; padding: 10px; justify-content:flex-end;
+    }
+    .tile{
+      display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center;
+      background: color-mix(in oklab, var(--card) 80%, transparent);
+      border: 1px solid color-mix(in oklab, var(--accent) 30%, #000 70%);
+      border-radius: 18px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      backdrop-filter: blur(4px) saturate(120%);
+      animation: pop .24s ease-out;
+    }
+    @keyframes pop{ from{ transform: translateY(10px) scale(.98); opacity:0 } to{ transform: translateY(0) scale(1); opacity:1 } }
+
+    .pfp{ width:38px; height:38px; border-radius:50%; background:#222; border:1px solid #333; overflow:hidden; }
+    .pfp img{ width:100%; height:100%; object-fit:cover; }
+
+    .meta{ line-height:1.15 }
+    .name{ font-weight:700; letter-spacing:.2px }
+    .sub{ color: var(--muted); font-size:.85rem }
+
+    .amount{ font-weight:800; font-size:1.05rem; padding:4px 10px; border-radius:999px; border:1px solid #2a2a3a }
+    .amount[data-tier="high"]{ background: linear-gradient(90deg, #3b82f6, #22c55e); }
+    .amount[data-tier="super"]{ background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+    .msg{ grid-column: 1 / -1; margin-top:6px; padding:10px 12px; border-radius:14px; background:#0d0d15; border:1px solid #202033; font-size:1.02rem; line-height:1.32 }
+    .badge{ font-size:.75rem; text-transform:uppercase; letter-spacing:.14em; color:#c8c8ff; opacity:.9 }
+
+    /* optional limiter */
+    .fadeTop{ position:absolute; left:0; right:0; top:0; height:80px; pointer-events:none; background:linear-gradient(to bottom, rgba(0,0,0,.6), transparent); }
+  </style>
+</head>
+<body>
+  <div id="stack"></div>
+  <div class="fadeTop"></div>
+
+  <!-- Configuration -->
+  <script src="config.js"></script>
+  
+  <!-- Socket.io client -->
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+
+  <script></script>
+  /**
+   * =============================
+   *  CONFIGURE ME
+   * =============================
+   * 1) Put your Streamlabs Socket token below (Dashboard → Settings → API Settings → API Tokens → Socket API Token)
+   * 2) Choose which paid types to include.
+   * 3) (Optional) Add a real translation provider & API key to translate into a random NON‑English language per message.
+   */
+  const CONFIG = {
+    streamlabsSocketToken: ENV_CONFIG.streamlabsSocketToken, // loaded from config.js
+
+    // Keep at most this many tiles on screen
+    maxTiles: 8,
+
+    // Treat Twitch Bits as paid? Set min bit threshold (0 to include all, e.g., cheers with text)
+    includeBits: true,
+    minBits: 1,
+
+    // Include Twitch Hype Chat (paid pinned chat)
+    includeHypeChat: true,
+
+    // Include YouTube Super Chat & Stickers
+    includeYouTube: true,
+
+    // Include Kick/Streamlabs native donations
+    includeDonations: true,
+
+    // Translation behavior — every message is shown in a RANDOM non‑English language.
+    translation: {
+      mode: "fake", // "fake" (no external calls) | "google" | "deepl" | "libre"
+
+      // When mode === 'google': supply Google Cloud Translate API key
+      googleApiKey: ENV_CONFIG.googleApiKey,
+
+      // When mode === 'deepl': supply API key, e.g. 'xxxxxxxx:fx'
+      deeplApiKey: ENV_CONFIG.deeplApiKey,
+      // 'DEEPL' targets are like 'ES', 'JA', 'RU'. We'll map automatically.
+
+      // When mode === 'libre': self-hosted or public LibreTranslate endpoint (may be unreliable)
+      libreEndpoint: "https://libretranslate.com/translate", // change if you host your own
+
+      // Pool of non‑English target languages we may randomly choose per message.
+      // Each entry can mark rtl + preferred font family stack for aesthetics.
+      targets: [
+        { code: 'es', name: 'Español' },
+        { code: 'pt', name: 'Português' },
+        { code: 'fr', name: 'Français' },
+        { code: 'de', name: 'Deutsch' },
+        { code: 'it', name: 'Italiano' },
+        { code: 'nl', name: 'Nederlands' },
+        { code: 'sv', name: 'Svenska' },
+        { code: 'pl', name: 'Polski' },
+        { code: 'tr', name: 'Türkçe' },
+        { code: 'ru', name: 'Русский' },
+        { code: 'uk', name: 'Українська' },
+        { code: 'el', name: 'Ελληνικά' },
+        { code: 'ar', name: 'العربية', rtl: true, font: '"Noto Naskh Arabic", "Noto Sans", system-ui, sans-serif' },
+        { code: 'he', name: 'עִבְרִית', rtl: true, font: '"Noto Sans Hebrew", "Noto Sans", system-ui, sans-serif' },
+        { code: 'hi', name: 'हिन्दी' },
+        { code: 'th', name: 'ไทย' },
+        { code: 'vi', name: 'Tiếng Việt' },
+        { code: 'id', name: 'Bahasa Indonesia' },
+        { code: 'ja', name: '日本語', font: '"Noto Sans JP", "Noto Sans", system-ui, sans-serif' },
+        { code: 'ko', name: '한국어', font: '"Noto Sans KR", "Noto Sans", system-ui, sans-serif' },
+        { code: 'zh', name: '中文', font: '"Noto Sans SC", "Noto Sans", system-ui, sans-serif' },
+      ],
+    }
+  };
+
+  // --- Utility: pick a random item ---
+  const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  // --- Translation layer ---
+  async function translateRandomNonEnglish(text){
+    const target = rnd(CONFIG.translation.targets);
+    // If no text or already empty, just output empty
+    if(!text || !text.trim()) return { text: '', target };
+
+    switch(CONFIG.translation.mode){
+      case 'google':
+        if(!CONFIG.translation.googleApiKey) return { text: fauxTranslate(text), target };
+        try{
+          const res = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${CONFIG.translation.googleApiKey}`,{
+            method:'POST', headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify({ q: text, target: target.code, format:'text' })
+          });
+          const data = await res.json();
+          const translated = data?.data?.translations?.[0]?.translatedText || fauxTranslate(text);
+          return { text: translated, target };
+        }catch(e){ console.warn('Translate (google) failed', e); return { text: fauxTranslate(text), target }; }
+
+      case 'deepl':
+        if(!CONFIG.translation.deeplApiKey) return { text: fauxTranslate(text), target };
+        try{
+          const to = (target.code || 'es').toUpperCase();
+          const form = new URLSearchParams({ text, target_lang: to });
+          const res = await fetch('https://api-free.deepl.com/v2/translate',{
+            method:'POST', headers:{ 'Authorization': `DeepL-Auth-Key ${CONFIG.translation.deeplApiKey}`, 'Content-Type':'application/x-www-form-urlencoded' }, body: form
+          });
+          const data = await res.json();
+          const translated = data?.translations?.[0]?.text || fauxTranslate(text);
+          return { text: translated, target };
+        }catch(e){ console.warn('Translate (deepl) failed', e); return { text: fauxTranslate(text), target }; }
+
+      case 'libre':
+        try{
+          const res = await fetch(CONFIG.translation.libreEndpoint,{
+            method:'POST', headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify({ q: text, source: 'auto', target: target.code, format:'text' })
+          });
+          const data = await res.json();
+          const translated = data?.translatedText || fauxTranslate(text);
+          return { text: translated, target };
+        }catch(e){ console.warn('Translate (libre) failed', e); return { text: fauxTranslate(text), target }; }
+
+      case 'fake':
+      default:
+        return { text: fauxTranslate(text), target };
+    }
+  }
+
+  // Simple faux translation (obfuscation) to a fake "non‑English" looking string, preserving length-ish
+  function fauxTranslate(s){
+    const map = {
+      'a':'á','e':'ê','i':'ï','o':'ō','u':'ü','A':'Á','E':'Ê','I':'Ï','O':'Ō','U':'Ü',
+      'c':'ç','C':'Ç','y':'ý','Y':'Ý','n':'ñ','N':'Ñ','t':'ţ','T':'Ţ','s':'š','S':'Š','d':'đ','D':'Đ','r':'ř','R':'Ř','l':'ł','L':'Ł'
+    };
+    return s.split('').map(ch => map[ch] || ch).join('');
+  }
+
+  // --- Streamlabs Socket connection ---
+  const stack = document.getElementById('stack');
+
+  if(!CONFIG.streamlabsSocketToken || CONFIG.streamlabsSocketToken.includes('PASTE_YOUR')){
+    warnTile('Missing Streamlabs Socket token', 'Edit CONFIG.streamlabsSocketToken in the HTML.');
+  } else {
+    const socket = io(`https://sockets.streamlabs.com?token=${CONFIG.streamlabsSocketToken}`, { transports:["websocket"] });
+
+    socket.on('connect', () => infoTile('Connected', 'Listening for paid events…'));
+    socket.on('disconnect', () => warnTile('Disconnected', 'Will retry automatically.'));
+
+    // Generic event stream
+    socket.on('event', async (eventData) => {
+      try{
+        const payloads = normalizeEvents(eventData);
+        for(const p of payloads){ await renderPaidEvent(p); }
+      }catch(e){ console.error('Event handling error', e); }
+    });
+  }
+
+  // Normalize Streamlabs event packet into a unified paid event shape
+  function normalizeEvents(evt){
+    const out = [];
+    // Streamlabs may send { type, message: [...] } or a single message
+    const type = evt?.type;
+    const arr = Array.isArray(evt?.message) ? evt.message : (evt?.message ? [evt.message] : []);
+
+    for(const m of arr){
+      // Donations (PayPal/Credit via Streamlabs; also Kick, etc.)
+      if((type === 'donation' || m?.type === 'donation') && CONFIG.includeDonations){
+        out.push({
+          platform: m?.platform || 'Donation',
+          user: m?.from || m?.name || 'Someone',
+          message: m?.message || '',
+          amount: Number(m?.amount || m?.amount_formatted || 0),
+          currency: m?.currency || m?.currency_code || '',
+          avatar: m?.avatar || '',
+          tier: tierFromAmount(Number(m?.amount || 0)),
+          raw: m
+        });
+      }
+
+      // YouTube Super Chat / Stickers
+      if((type === 'superchat' || m?.type === 'superchat') && CONFIG.includeYouTube){
+        out.push({
+          platform: 'YouTube',
+          user: m?.name || m?.display_name || 'YouTube User',
+          message: m?.comment || m?.message || '',
+          amount: Number(m?.amount || 0),
+          currency: m?.currency || m?.currency_code || '',
+          avatar: m?.profileImageUrl || m?.avatar || '',
+          tier: tierFromAmount(Number(m?.amount || 0)),
+          raw: m
+        });
+      }
+
+      // Twitch Hype Chat (paid pinned chat)
+      if((type === 'hype_chat' || m?.type === 'hype_chat') && CONFIG.includeHypeChat){
+        out.push({
+          platform: 'Twitch Hype Chat',
+          user: m?.name || m?.display_name || 'Twitch User',
+          message: m?.message || '',
+          amount: Number(m?.amount || (m?.purchased || 0)),
+          currency: m?.currency || 'USD',
+          avatar: m?.profileImageUrl || m?.avatar || '',
+          tier: tierFromAmount(Number(m?.amount || m?.purchased || 0)),
+          raw: m
+        });
+      }
+
+      // Twitch Bits (optional) — treat as paid if >= minBits
+      if((type === 'bits' || m?.type === 'bits' || m?.type === 'cheer') && CONFIG.includeBits){
+        const bits = Number(m?.amount || m?.bits || 0);
+        if(bits >= CONFIG.minBits){
+          out.push({
+            platform: 'Twitch Bits',
+            user: m?.name || m?.display_name || 'Twitch User',
+            message: m?.message || '',
+            amount: bits,
+            currency: 'BITS',
+            avatar: m?.profileImageUrl || m?.avatar || '',
+            tier: tierFromAmount(bits/100), // approx $1 per 100 bits
+            raw: m
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  function tierFromAmount(amt){
+    if(amt >= 50) return 'super';
+    if(amt >= 10) return 'high';
+    return 'base';
+  }
+
+  async function renderPaidEvent(evt){
+    // Translate message to a random non‑EN language
+    const { text: translated, target } = await translateRandomNonEnglish(evt.message || '');
+
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+
+    // RTL support
+    if(target?.rtl){ tile.dir = 'rtl'; }
+
+    tile.innerHTML = `
+      <div class="pfp">${ evt.avatar ? `<img src="${escapeHtml(evt.avatar)}" alt="pfp"/>` : ''}</div>
+      <div class="meta">
+        <div class="name">${escapeHtml(evt.user)}</div>
+        <div class="sub"><span class="badge">${escapeHtml(evt.platform)}</span> • ${escapeHtml(target?.name || '')}</div>
+      </div>
+      <div class="amount" data-tier="${evt.tier}">${ formatAmount(evt.amount, evt.currency) }</div>
+      <div class="msg" style="${ target?.font ? `font-family:${target.font}` : '' }">${ translated ? sanitizeHtml(translated) : '<em>(no message)</em>' }</div>
+    `;
+
+    stack.appendChild(tile);
+    pruneTiles();
+  }
+
+  function pruneTiles(){
+    while(stack.children.length > CONFIG.maxTiles){ stack.removeChild(stack.firstChild); }
+  }
+
+  function formatAmount(amt, cur){
+    if(cur === 'BITS') return `${Math.round(amt)} Bits`;
+    try{ return new Intl.NumberFormat(undefined, { style:'currency', currency: cur || 'USD' }).format(amt || 0); }
+    catch{ return `$${Number(amt||0).toFixed(2)}`; }
+  }
+
+  function infoTile(title, msg){ baseTile(title, msg, 'ok'); }
+  function warnTile(title, msg){ baseTile(title, msg, 'warn'); }
+  function baseTile(title, msg, kind){
+    const t = document.createElement('div'); t.className = 'tile';
+    t.innerHTML = `
+      <div class="pfp"></div>
+      <div class="meta">
+        <div class="name">${escapeHtml(title)}</div>
+        <div class="sub">${escapeHtml(kind==='ok'?'Info':'Warning')}</div>
+      </div>
+      <div class="amount" data-tier="${kind==='ok'?'high':'super'}">${ kind==='ok' ? 'Ready' : 'Action' }</div>
+      <div class="msg">${escapeHtml(msg)}</div>
+    `;
+    stack.appendChild(t); pruneTiles();
+  }
+
+  // Basic HTML escaping for text nodes
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+  // Allow a small subset of formatting from provider translations; strip scripts
+  function sanitizeHtml(s){
+    // Remove script/style tags outright
+    s = s.replace(/<\/(script|style)>/gi, '').replace(/<(script|style)[^>]*>.*?<\/\1>/gis, '');
+    // Very basic allowlist: b/i/strong/em/br/span
+    return s.replace(/<(?!\/?(?:b|i|strong|em|br|span)(\s|>))/gi, '&lt;');
+  }
+  </script>
+</body>
+</html>
