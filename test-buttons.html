@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OBS Overlay Test Buttons</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .section {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+    button {
+      background: #7c5cff;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #6a4de6;
+    }
+    .warning {
+      background: #f59e0b;
+      color: #000;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .success {
+      background: #22c55e;
+      color: #000;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .info {
+      background: #3b82f6;
+      color: #fff;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 OBS Overlay Tester</h1>
+    
+    <div class="info">
+      <strong>Instructions:</strong><br>
+      1. Make sure your OBS Browser Source is pointing to <code>paid-chat.html</code><br>
+      2. Click the buttons below to send test events<br>
+      3. Watch your OBS overlay for the messages to appear
+    </div>
+
+    <div class="section">
+      <h3>💰 Test Donations</h3>
+      <button onclick="testDonation(5)">$5 Donation</button>
+      <button onclick="testDonation(25)">$25 Donation</button>
+      <button onclick="testDonation(100)">$100 Big Donation</button>
+      <button onclick="testDonationWithMessage()">Donation + Message</button>
+    </div>
+
+    <div class="section">
+      <h3>🎬 Test YouTube Super Chat</h3>
+      <button onclick="testSuperChat(2)">$2 Super Chat</button>
+      <button onclick="testSuperChat(10)">$10 Super Chat</button>
+      <button onclick="testSuperChat(50)">$50 Super Chat</button>
+    </div>
+
+    <div class="section">
+      <h3>💎 Test Twitch</h3>
+      <button onclick="testBits(100)">100 Bits</button>
+      <button onclick="testBits(1000)">1000 Bits</button>
+      <button onclick="testHypeChat()">Hype Chat</button>
+    </div>
+
+    <div class="section">
+      <h3>🧪 Advanced Tests</h3>
+      <button onclick="testSpam()">Spam Test (5 messages)</button>
+      <button onclick="testLongMessage()">Long Message</button>
+      <button onclick="testInternational()">International Messages</button>
+      <button onclick="clearAll()">Clear All Messages</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // This script sends events directly to the OBS overlay window
+    // It works by finding the overlay window and calling its test functions
+
+    function findOverlayWindow() {
+      // Try to find the overlay window in different ways
+      
+      // Method 1: Check if we're in the same window (for testing)
+      if (window.handleTestEvent) {
+        return window;
+      }
+      
+      // Method 2: Try to access parent window (if overlay is in iframe)
+      try {
+        if (window.parent && window.parent.handleTestEvent) {
+          return window.parent;
+        }
+      } catch(e) {}
+      
+      // Method 3: Try to find overlay in other windows
+      try {
+        for (let i = 0; i < window.frames.length; i++) {
+          if (window.frames[i].handleTestEvent) {
+            return window.frames[i];
+          }
+        }
+      } catch(e) {}
+      
+      return null;
+    }
+
+    function sendEvent(eventData) {
+      const overlayWindow = findOverlayWindow();
+      
+      if (overlayWindow && overlayWindow.handleTestEvent) {
+        overlayWindow.handleTestEvent(eventData);
+        showStatus('✅ Event sent successfully!', 'success');
+      } else {
+        // Fallback: Use localStorage to communicate with overlay
+        localStorage.setItem('overlayTestEvent', JSON.stringify({
+          event: eventData,
+          timestamp: Date.now()
+        }));
+        showStatus('📡 Event sent via localStorage (check overlay)', 'info');
+      }
+    }
+
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.innerHTML = `<div class="${type}">${message}</div>`;
+      setTimeout(() => {
+        status.innerHTML = '';
+      }, 3000);
+    }
+
+    function testDonation(amount) {
+      sendEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'TestDonor',
+          message: `Thank you for the great stream! Here's $${amount}`,
+          amount: amount,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/7c5cff/ffffff?text=D'
+        }]
+      });
+    }
+
+    function testDonationWithMessage() {
+      sendEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'MessageTester',
+          message: 'This is a longer test message to see how the overlay handles text wrapping and translation features!',
+          amount: 15,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/22c55e/ffffff?text=M'
+        }]
+      });
+    }
+
+    function testSuperChat(amount) {
+      sendEvent({
+        type: 'superchat',
+        message: [{
+          type: 'superchat',
+          name: 'YouTubeFan',
+          comment: `Amazing content! Worth every penny of this $${amount} super chat!`,
+          amount: amount,
+          currency: 'USD',
+          profileImageUrl: 'https://via.placeholder.com/40/ef4444/ffffff?text=Y'
+        }]
+      });
+    }
+
+    function testBits(amount) {
+      sendEvent({
+        type: 'bits',
+        message: [{
+          type: 'bits',
+          name: 'TwitchViewer',
+          message: `Cheer${amount} Great stream, keep it up!`,
+          amount: amount,
+          profileImageUrl: 'https://via.placeholder.com/40/9333ea/ffffff?text=T'
+        }]
+      });
+    }
+
+    function testHypeChat() {
+      sendEvent({
+        type: 'hype_chat',
+        message: [{
+          type: 'hype_chat',
+          name: 'HypedViewer',
+          message: 'This stream is absolutely incredible! 🔥🔥🔥',
+          amount: 5,
+          currency: 'USD',
+          profileImageUrl: 'https://via.placeholder.com/40/06b6d4/ffffff?text=H'
+        }]
+      });
+    }
+
+    function testSpam() {
+      for (let i = 1; i <= 5; i++) {
+        setTimeout(() => {
+          sendEvent({
+            type: 'donation',
+            message: [{
+              type: 'donation',
+              from: `SpamUser${i}`,
+              message: `Spam message #${i}`,
+              amount: i * 2,
+              currency: 'USD',
+              avatar: `https://via.placeholder.com/40/7c5cff/ffffff?text=${i}`
+            }]
+          });
+        }, i * 500);
+      }
+    }
+
+    function testLongMessage() {
+      sendEvent({
+        type: 'donation',
+        message: [{
+          type: 'donation',
+          from: 'LongMessageUser',
+          message: 'This is an extremely long message designed to test how the overlay handles lengthy text content that spans multiple lines and contains various punctuation marks, emojis 🎉, and different types of characters to ensure the translation system works properly with extended content!',
+          amount: 20,
+          currency: 'USD',
+          avatar: 'https://via.placeholder.com/40/ec4899/ffffff?text=L'
+        }]
+      });
+    }
+
+    function testInternational() {
+      const messages = [
+        { text: 'Hello from America! 🇺🇸', user: 'USAFan' },
+        { text: 'こんにちは日本から！🇯🇵', user: 'JapanViewer' },
+        { text: '안녕하세요 한국에서! 🇰🇷', user: 'KoreaFan' },
+        { text: 'مرحبا من العالم العربي! 🌍', user: 'ArabicUser' },
+        { text: 'Привет из России! 🇷🇺', user: 'RussianFan' }
+      ];
+
+      messages.forEach((msg, i) => {
+        setTimeout(() => {
+          sendEvent({
+            type: 'donation',
+            message: [{
+              type: 'donation',
+              from: msg.user,
+              message: msg.text,
+              amount: 5,
+              currency: 'USD',
+              avatar: `https://via.placeholder.com/40/3b82f6/ffffff?text=${i + 1}`
+            }]
+          });
+        }, i * 1000);
+      });
+    }
+
+    function clearAll() {
+      const overlayWindow = findOverlayWindow();
+      if (overlayWindow && overlayWindow.clearAllMessages) {
+        overlayWindow.clearAllMessages();
+        showStatus('🧹 Messages cleared!', 'success');
+      } else {
+        localStorage.setItem('overlayClearMessages', Date.now().toString());
+        showStatus('🧹 Clear command sent via localStorage', 'info');
+      }
+    }
+
+    // Show initial status
+    showStatus('🚀 Test buttons ready! Click any button to test the overlay.', 'info');
+  </script>
+</body>
+</html>

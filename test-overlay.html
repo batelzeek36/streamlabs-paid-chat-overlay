@@ -43,6 +43,14 @@
     button:hover {
       background: #6a4de6;
     }
+    select {
+      background: #2a2a2a;
+      color: white;
+      border: 1px solid #444;
+      padding: 8px 12px;
+      border-radius: 5px;
+      margin: 5px;
+    }
     .test-section {
       margin: 15px 0;
     }
@@ -63,6 +71,15 @@
     <p>Test your paid chat overlay without needing real donations!</p>
     
     <div class="controls">
+      <div class="test-section">
+        <h3>🎯 Overlay Selection</h3>
+        <select id="overlaySelect" onchange="switchOverlay()">
+          <option value="paid-chat-test.html">Test Version (Recommended)</option>
+          <option value="paid-chat.html">Production Version</option>
+        </select>
+        <button onclick="reloadOverlay()">Reload Overlay</button>
+      </div>
+      
       <div class="test-section">
         <h3>💰 Donations</h3>
         <button onclick="testDonation()">$5 Donation</button>
@@ -108,6 +125,15 @@
         overlayWindow.handleTestEvent(eventData);
       } else {
         console.log('Overlay not ready yet, try again in a moment');
+        // Try again after a short delay
+        setTimeout(() => {
+          const retryWindow = getOverlayWindow();
+          if (retryWindow && retryWindow.handleTestEvent) {
+            retryWindow.handleTestEvent(eventData);
+          } else {
+            alert('Overlay not ready. Make sure the iframe has loaded completely and try again.');
+          }
+        }, 1000);
       }
     }
 
@@ -280,6 +306,17 @@
       if (overlayWindow && overlayWindow.clearAllMessages) {
         overlayWindow.clearAllMessages();
       }
+    }
+
+    function switchOverlay() {
+      const select = document.getElementById('overlaySelect');
+      const iframe = document.getElementById('overlayFrame');
+      iframe.src = select.value;
+    }
+
+    function reloadOverlay() {
+      const iframe = document.getElementById('overlayFrame');
+      iframe.src = iframe.src;
     }
   </script>
 </body>
